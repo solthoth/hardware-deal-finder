@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from enum import StrEnum
+from typing import Protocol
 
 from pydantic import BaseModel
 
@@ -40,6 +41,11 @@ class SearchRun(BaseModel):
     ranked: list[RankedListing]
     provider_results: dict[str, ProviderResult]
     rejected_count: int = 0
+    run_id: int | None = None
+
+
+class ResultStore(Protocol):
+    def save(self, ranked: list[RankedListing]) -> int: ...
 
 
 class SearchService:
@@ -51,21 +57,30 @@ class SearchService:
         enricher: KnowledgeEnricher,
         listing_filter: ListingFilter,
         scorer: DealScorer,
+        store: ResultStore | None = None,
     ) -> None:
         self.config = config
         self.providers = providers
         self.enricher = enricher
         self.listing_filter = listing_filter
         self.scorer = scorer
+        self.store = store
 
     @classmethod
-    def from_config(cls, config: SearchConfig, providers: list[HardwareProvider]) -> SearchService:
+    def from_config(
+        cls,
+        config: SearchConfig,
+        providers: list[HardwareProvider],
+        *,
+        store: ResultStore | None = None,
+    ) -> SearchService:
         return cls(
             config,
             providers,
             enricher=KnowledgeEnricher(),
             listing_filter=ListingFilter(config.search),
             scorer=DealScorer(config.search, config.scoring, config.upgrade_costs),
+            store=store,
         )
 
     async def search(self) -> SearchRun:
@@ -86,10 +101,12 @@ class SearchService:
                 rejected_count += 1
         ranked = [self._apply_trust(self.scorer.score(listing)) for listing in accepted]
         ranked.sort(key=lambda item: item.score.total, reverse=True)
+        run_id = await asyncio.to_thread(self.store.save, ranked) if self.store else None
         return SearchRun(
             ranked=ranked,
             provider_results=statuses,
             rejected_count=rejected_count,
+            run_id=run_id,
         )
 
     async def _safe_search(
