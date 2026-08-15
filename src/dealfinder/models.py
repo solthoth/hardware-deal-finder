@@ -94,3 +94,34 @@ class RankedListing(BaseModel):
     @property
     def required_quantity_cost(self) -> Decimal:
         return (self.listing.total_price + self.estimated_upgrade_cost) * self.quantity_required
+
+
+class ClusterAllocation(BaseModel):
+    provider: str
+    listing_id: str | None
+    seller_name: str | None
+    url: HttpUrl
+    quantity: int = Field(gt=0)
+    unit_price: Decimal = Field(ge=0)
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def subtotal(self) -> Decimal:
+        return self.unit_price * self.quantity
+
+
+class ClusterDeal(BaseModel):
+    configuration: str
+    quantity: int = Field(gt=0)
+    allocations: list[ClusterAllocation]
+    hardware_cost: Decimal = Field(ge=0)
+    upgrade_cost: Decimal = Field(ge=0)
+    score: float = Field(ge=0, le=100)
+    cores_per_node: int | None = Field(default=None, gt=0)
+    threads_per_node: int | None = Field(default=None, gt=0)
+    installed_memory_gb_per_node: int | None = Field(default=None, gt=0)
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def total_cost(self) -> Decimal:
+        return self.hardware_cost + self.upgrade_cost

@@ -14,16 +14,24 @@ class ListingFilter:
     def __init__(self, criteria: SearchCriteria) -> None:
         self.criteria = criteria
 
-    def evaluate(self, listing: HardwareListing) -> FilterDecision:
+    def evaluate(
+        self, listing: HardwareListing, *, enforce_quantity: bool = True
+    ) -> FilterDecision:
         reasons: list[str] = []
         warnings: list[str] = []
-        self._check_basics(listing, reasons)
+        self._check_basics(listing, reasons, enforce_quantity=enforce_quantity)
         self._check_specs(listing, reasons, warnings)
         self._check_security(listing, reasons, warnings)
         self._check_seller(listing, reasons, warnings)
         return FilterDecision(accepted=not reasons, reasons=reasons, warnings=warnings)
 
-    def _check_basics(self, listing: HardwareListing, reasons: list[str]) -> None:
+    def _check_basics(
+        self,
+        listing: HardwareListing,
+        reasons: list[str],
+        *,
+        enforce_quantity: bool,
+    ) -> None:
         if listing.total_price > self.criteria.price.max_per_unit:
             reasons.append(f"total price {listing.total_price} exceeds maximum")
         title = listing.title.casefold()
@@ -37,7 +45,8 @@ class ListingFilter:
         ):
             reasons.append(f"condition not allowed: {listing.condition}")
         if (
-            listing.quantity_available is not None
+            enforce_quantity
+            and listing.quantity_available is not None
             and listing.quantity_available < self.criteria.quantity_required
         ):
             reasons.append(

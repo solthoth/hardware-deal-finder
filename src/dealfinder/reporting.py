@@ -32,25 +32,38 @@ def render_table(run: SearchRun, criteria: SearchCriteria) -> str:
             f"${listing.total_price:>8}"
         )
     if not run.ranked:
-        lines.append("No qualifying listings found.")
-    else:
-        best = run.ranked[0]
-        listing = best.listing
-        cores = listing.physical_cores.value if listing.physical_cores else 0
-        threads = listing.threads.value if listing.threads else 0
+        lines.append("No single listing can satisfy the requested quantity.")
+    if run.cluster_deals:
+        best_cluster = run.cluster_deals[0]
         lines.extend(
             [
                 "",
                 "Best Cluster Deal",
-                f"  {listing.title}",
-                f"  Hardware: ${listing.total_price * criteria.quantity_required}",
-                f"  Estimated upgrades: "
-                f"${best.estimated_upgrade_cost * criteria.quantity_required}",
-                f"  Estimated cluster total: ${best.required_quantity_cost}",
-                f"  CPU total: {cores * criteria.quantity_required} cores / "
-                f"{threads * criteria.quantity_required} threads",
+                f"  {best_cluster.configuration}",
+                f"  Quantity: {best_cluster.quantity}",
+                f"  Hardware: ${best_cluster.hardware_cost}",
+                f"  Estimated upgrades: ${best_cluster.upgrade_cost}",
+                f"  Estimated cluster total: ${best_cluster.total_cost}",
             ]
         )
+        if best_cluster.cores_per_node and best_cluster.threads_per_node:
+            lines.append(
+                f"  CPU total: {best_cluster.cores_per_node * best_cluster.quantity} cores / "
+                f"{best_cluster.threads_per_node * best_cluster.quantity} threads"
+            )
+        if best_cluster.installed_memory_gb_per_node:
+            lines.append(
+                f"  Installed RAM total: "
+                f"{best_cluster.installed_memory_gb_per_node * best_cluster.quantity} GB"
+            )
+        lines.append("  Allocations:")
+        lines.extend(
+            f"    {allocation.quantity} x {allocation.provider} / "
+            f"{allocation.seller_name or 'unknown seller'} @ ${allocation.unit_price}"
+            for allocation in best_cluster.allocations
+        )
+    elif not run.ranked:
+        lines.append("No complete cluster deal found.")
     if run.provider_results:
         lines.extend(["", "Providers:"])
         for name, provider_result in run.provider_results.items():

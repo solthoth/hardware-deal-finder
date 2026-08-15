@@ -7,13 +7,14 @@ import logging
 from enum import StrEnum
 from typing import Protocol
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
+from dealfinder.cluster import build_cluster_deals
 from dealfinder.config import SearchConfig
 from dealfinder.deduplication import deduplicate
 from dealfinder.enrichment import KnowledgeEnricher
 from dealfinder.filtering import ListingFilter
-from dealfinder.models import HardwareListing, RankedListing
+from dealfinder.models import ClusterDeal, HardwareListing, RankedListing
 from dealfinder.providers.base import (
     HardwareProvider,
     ProviderRateLimited,
@@ -39,6 +40,7 @@ class ProviderResult(BaseModel):
 
 class SearchRun(BaseModel):
     ranked: list[RankedListing]
+    cluster_deals: list[ClusterDeal] = Field(default_factory=list)
     provider_results: dict[str, ProviderResult]
     rejected_count: int = 0
     run_id: int | None = None
@@ -91,19 +93,30 @@ class SearchService:
         listings = [listing for _, _, found in provider_outputs for listing in found]
         enriched = [self.enricher.enrich(listing) for listing in deduplicate(listings)]
         accepted: list[HardwareListing] = []
+        cluster_candidates: list[RankedListing] = []
         rejected_count = 0
         for listing in enriched:
-            decision = self.listing_filter.evaluate(listing)
-            if decision.accepted:
-                listing.raw_attributes["warnings"] = decision.warnings
+            specification_decision = self.listing_filter.evaluate(listing, enforce_quantity=False)
+            if not specification_decision.accepted:
+                rejected_count += 1
+                continue
+            listing.raw_attributes["warnings"] = specification_decision.warnings
+            cluster_candidates.append(self._apply_trust(self.scorer.score(listing)))
+            quantity_decision = self.listing_filter.evaluate(listing)
+            if quantity_decision.accepted:
+                listing.raw_attributes["warnings"] = quantity_decision.warnings
                 accepted.append(listing)
             else:
                 rejected_count += 1
         ranked = [self._apply_trust(self.scorer.score(listing)) for listing in accepted]
         ranked.sort(key=lambda item: item.score.total, reverse=True)
+        cluster_deals = build_cluster_deals(
+            cluster_candidates, self.config.search.quantity_required
+        )
         run_id = await asyncio.to_thread(self.store.save, ranked) if self.store else None
         return SearchRun(
             ranked=ranked,
+            cluster_deals=cluster_deals,
             provider_results=statuses,
             rejected_count=rejected_count,
             run_id=run_id,
