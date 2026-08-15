@@ -20,6 +20,10 @@ class ProviderRateLimited(ProviderError):
     """The provider exhausted its retry budget after rate limiting."""
 
 
+class ProviderUnsupported(ProviderError):
+    """No safe supported integration exists for this marketplace."""
+
+
 class HardwareProvider(ABC):
     """Marketplace plugin interface."""
 

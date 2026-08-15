@@ -19,6 +19,7 @@ from dealfinder.providers.base import (
     HardwareProvider,
     ProviderRateLimited,
     ProviderUnavailable,
+    ProviderUnsupported,
 )
 from dealfinder.scoring import DealScorer
 
@@ -30,6 +31,7 @@ class ProviderStatus(StrEnum):
     UNAVAILABLE = "unavailable"
     RATE_LIMITED = "rate_limited"
     ERROR = "error"
+    UNSUPPORTED = "unsupported"
 
 
 class ProviderResult(BaseModel):
@@ -127,6 +129,12 @@ class SearchService:
     ) -> tuple[HardwareProvider, ProviderResult, list[HardwareListing]]:
         try:
             listings = await provider.search(self.config.search)
+        except ProviderUnsupported as error:
+            return (
+                provider,
+                ProviderResult(status=ProviderStatus.UNSUPPORTED, message=str(error)),
+                [],
+            )
         except ProviderRateLimited as error:
             return (
                 provider,

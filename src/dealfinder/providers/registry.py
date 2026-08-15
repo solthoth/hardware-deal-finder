@@ -6,7 +6,7 @@ from collections.abc import Callable
 
 from dealfinder.config import SearchCriteria, SiteConfig, SitesConfig
 from dealfinder.models import HardwareListing
-from dealfinder.providers.base import HardwareProvider, ProviderUnavailable
+from dealfinder.providers.base import HardwareProvider, ProviderUnsupported
 
 ProviderFactory = Callable[[SiteConfig], HardwareProvider]
 _FACTORIES: dict[str, ProviderFactory] = {}
@@ -28,7 +28,7 @@ class UnsupportedProvider(HardwareProvider):
         self.name = name
 
     async def search(self, criteria: SearchCriteria) -> list[HardwareListing]:
-        raise ProviderUnavailable(f"provider {self.name!r} is a configured placeholder")
+        raise ProviderUnsupported(f"provider {self.name!r} has no registered integration")
 
 
 def create_enabled_providers(config: SitesConfig) -> list[HardwareProvider]:

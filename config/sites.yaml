@@ -5,6 +5,13 @@ sites:
     trust_weight: 1.0
     settings: {marketplace_id: EBAY_US}
   fixture: {enabled: false, trust_weight: 1.0}
+  generic:
+    enabled: false
+    trust_weight: 1.0
+    settings:
+      endpoint: https://catalog.example.com/hardware.json
+      items_path: items
+      field_map: {id: id, title: title, url: url, price: price}
   amazon: {enabled: false, trust_weight: 0.9, settings: {status: placeholder}}
   newegg: {enabled: false, trust_weight: 0.9, settings: {status: placeholder}}
   minisforum: {enabled: false, trust_weight: 1.0, settings: {status: placeholder}}

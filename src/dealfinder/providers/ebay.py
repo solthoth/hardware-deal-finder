@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import base64
 import os
 from collections.abc import Mapping
@@ -15,14 +14,13 @@ from dealfinder.models import HardwareListing
 from dealfinder.normalization import normalize_listing
 from dealfinder.providers.base import (
     HardwareProvider,
-    ProviderRateLimited,
     ProviderUnavailable,
 )
+from dealfinder.providers.http import ResilientHttpClient
 from dealfinder.providers.registry import register_provider
 
 TOKEN_URL = "https://api.ebay.com/identity/v1/oauth2/token"
 SEARCH_URL = "https://api.ebay.com/buy/browse/v1/item_summary/search"
-USER_AGENT = "hardware-deal-finder/0.1 (+https://github.com/solthoth/hardware-deal-finder)"
 
 
 @register_provider("ebay")
@@ -51,15 +49,10 @@ class EbayProvider(HardwareProvider):
             raise ProviderUnavailable(
                 "set EBAY_CLIENT_ID and EBAY_CLIENT_SECRET to enable the eBay Browse API"
             )
-        owns_client = self.client is None
-        client = self.client or httpx.AsyncClient(
-            timeout=self.config.request_timeout_seconds,
-            headers={"User-Agent": USER_AGENT},
-        )
+        client = ResilientHttpClient(self.name, self.config, client=self.client)
         try:
             token = await self._token(client)
-            response = await self._request(
-                client,
+            response = await client.request(
                 "GET",
                 SEARCH_URL,
                 headers={
@@ -72,16 +65,15 @@ class EbayProvider(HardwareProvider):
                     "q": criteria.query or " ".join(criteria.cpu.preferred_models[:3]),
                     "limit": str(self.config.max_listings),
                 },
+                cache_ttl_seconds=float(self.config.settings.get("response_cache_seconds", 300)),
             )
             return [self._normalize(item) for item in response.json().get("itemSummaries", [])]
         finally:
-            if owns_client:
-                await client.aclose()
+            await client.aclose()
 
-    async def _token(self, client: httpx.AsyncClient) -> str:
+    async def _token(self, client: ResilientHttpClient) -> str:
         credentials = base64.b64encode(f"{self.client_id}:{self.client_secret}".encode()).decode()
-        response = await self._request(
-            client,
+        response = await client.request(
             "POST",
             TOKEN_URL,
             headers={
@@ -97,36 +89,6 @@ class EbayProvider(HardwareProvider):
         if not token:
             raise ProviderUnavailable("eBay OAuth response did not contain an access token")
         return str(token)
-
-    async def _request(
-        self,
-        client: httpx.AsyncClient,
-        method: str,
-        url: str,
-        **kwargs: Any,
-    ) -> httpx.Response:
-        last_status = 0
-        for attempt in range(3):
-            try:
-                response = await client.request(method, url, **kwargs)
-            except httpx.HTTPError as error:
-                if attempt == 2:
-                    raise ProviderUnavailable(f"eBay request failed: {error}") from error
-                await asyncio.sleep(2**attempt)
-                continue
-            last_status = response.status_code
-            if response.status_code == 429:
-                if attempt < 2:
-                    await asyncio.sleep(2**attempt)
-                    continue
-                raise ProviderRateLimited("eBay rate limited requests after retries")
-            if response.status_code >= 500 and attempt < 2:
-                await asyncio.sleep(2**attempt)
-                continue
-            if response.is_error:
-                raise ProviderUnavailable(f"eBay API returned HTTP {response.status_code}")
-            return response
-        raise ProviderUnavailable(f"eBay API remained unavailable (HTTP {last_status})")
 
     def _normalize(self, item: Mapping[str, Any]) -> HardwareListing:
         shipping_options = item.get("shippingOptions") or []

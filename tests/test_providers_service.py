@@ -58,7 +58,7 @@ async def test_ebay_provider_normalizes_mocked_browse_api(search_config: SearchC
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
         provider = EbayProvider(
-            SiteConfig(max_listings=10),
+            SiteConfig(max_listings=10, rate_limit_per_second=10_000),
             client_id="id",
             client_secret="secret",
             client=client,
