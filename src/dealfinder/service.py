@@ -43,13 +43,14 @@ class ProviderResult(BaseModel):
 class SearchRun(BaseModel):
     ranked: list[RankedListing]
     cluster_deals: list[ClusterDeal] = Field(default_factory=list)
+    observed: list[RankedListing] = Field(default_factory=list, exclude=True)
     provider_results: dict[str, ProviderResult]
     rejected_count: int = 0
     run_id: int | None = None
 
 
 class ResultStore(Protocol):
-    def save(self, ranked: list[RankedListing]) -> int: ...
+    def save_run(self, run: SearchRun) -> int: ...
 
 
 class SearchService:
@@ -115,14 +116,17 @@ class SearchService:
         cluster_deals = build_cluster_deals(
             cluster_candidates, self.config.search.quantity_required
         )
-        run_id = await asyncio.to_thread(self.store.save, ranked) if self.store else None
-        return SearchRun(
+        run = SearchRun(
             ranked=ranked,
             cluster_deals=cluster_deals,
+            observed=cluster_candidates,
             provider_results=statuses,
             rejected_count=rejected_count,
-            run_id=run_id,
         )
+        if self.store is None:
+            return run
+        run_id = await asyncio.to_thread(self.store.save_run, run)
+        return run.model_copy(update={"run_id": run_id})
 
     async def _safe_search(
         self, provider: HardwareProvider

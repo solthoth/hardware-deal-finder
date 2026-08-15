@@ -8,6 +8,7 @@ import json
 
 from dealfinder.config import SearchCriteria
 from dealfinder.models import AttributeValue, RankedListing
+from dealfinder.persistence import PriceObservation
 from dealfinder.service import SearchRun
 
 
@@ -142,4 +143,28 @@ def render_detail(result: RankedListing) -> str:
         lines.extend(["", "Missing information:", *(f"- {label}" for label in missing)])
     if result.warnings:
         lines.extend(["", "Warnings:", *(f"- {warning}" for warning in result.warnings)])
+    return "\n".join(lines)
+
+
+def render_price_history(history: list[PriceObservation], output_format: str) -> str:
+    if output_format == "json":
+        return json.dumps(
+            [
+                {
+                    "observed_at": item.observed_at.isoformat(),
+                    "total_price": str(item.total_price),
+                    "availability": item.availability,
+                    "score": item.score,
+                }
+                for item in history
+            ],
+            indent=2,
+        )
+    lines = [f"{'Observed at':<34} {'Total':>10} {'Qty':>6} {'Score':>8}", "-" * 62]
+    lines.extend(
+        f"{item.observed_at.isoformat():<34} ${item.total_price:>9} "
+        f"{(item.availability if item.availability is not None else '?')!s:>6} "
+        f"{item.score:>8.1f}"
+        for item in history
+    )
     return "\n".join(lines)

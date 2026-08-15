@@ -71,3 +71,27 @@ def test_cli_search_with_no_enabled_providers_returns_valid_json(
     assert exit_code == 0
     output = capsys.readouterr().out  # type: ignore[attr-defined]
     assert json.loads(output)["ranked"] == []
+
+
+def test_cli_price_history_reports_persisted_observations(
+    tmp_path: Path, capsys: object, good_listing: HardwareListing
+) -> None:
+    config = load_search_config("config/search.yaml")
+    ranked = DealScorer(config.search, config.scoring, config.upgrade_costs).score(good_listing)
+    state = tmp_path / "history.db"
+    repository = SQLiteRepository(state)
+    repository.save_run(SearchRun(ranked=[ranked], observed=[ranked], provider_results={}))
+    exit_code = main(
+        [
+            "history",
+            "fixture",
+            "1",
+            "--state",
+            str(state),
+            "--format",
+            "json",
+        ]
+    )
+    assert exit_code == 0
+    output = json.loads(capsys.readouterr().out)  # type: ignore[attr-defined]
+    assert output[0]["total_price"] == "250"

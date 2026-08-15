@@ -1,10 +1,12 @@
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 
 from dealfinder.cluster import build_cluster_deals
 from dealfinder.config import SearchConfig, SiteConfig
 from dealfinder.models import HardwareListing
+from dealfinder.persistence import SQLiteRepository
 from dealfinder.providers.fixture import FixtureProvider
 from dealfinder.reporting import render_table
 from dealfinder.scoring import DealScorer
@@ -60,7 +62,7 @@ def test_cluster_plan_does_not_mix_different_configurations(
 
 @pytest.mark.asyncio
 async def test_service_distinguishes_individual_and_grouped_cluster_deals(
-    search_config: SearchConfig, good_listing: HardwareListing
+    tmp_path: Path, search_config: SearchConfig, good_listing: HardwareListing
 ) -> None:
     listings = [
         good_listing.model_copy(
@@ -71,10 +73,15 @@ async def test_service_distinguishes_individual_and_grouped_cluster_deals(
         ),
     ]
     provider = FixtureProvider(SiteConfig(), listings=listings)
-    run = await SearchService.from_config(search_config, [provider]).search()
+    repository = SQLiteRepository(tmp_path / "clusters.db")
+    run = await SearchService.from_config(search_config, [provider], store=repository).search()
     assert run.ranked == []
     assert len(run.cluster_deals) == 1
     assert run.cluster_deals[0].quantity == 3
     output = render_table(run, search_config.search)
     assert "Best Cluster Deal" in output
     assert "1 x fixture / b" in output
+    assert run.run_id is not None
+    saved = repository.load_run(run.run_id)
+    assert saved.cluster_deals[0].total_cost == run.cluster_deals[0].total_cost
+    assert len(repository.price_history("fixture", "a")) == 1

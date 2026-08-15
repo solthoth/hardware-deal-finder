@@ -13,7 +13,13 @@ from pathlib import Path
 from dealfinder.config import SearchConfig, SitesConfig, load_search_config, load_sites_config
 from dealfinder.persistence import SQLiteRepository
 from dealfinder.providers import create_enabled_providers
-from dealfinder.reporting import render_csv, render_detail, render_json, render_table
+from dealfinder.reporting import (
+    render_csv,
+    render_detail,
+    render_json,
+    render_price_history,
+    render_table,
+)
 from dealfinder.service import SearchRun, SearchService
 
 DEFAULT_STATE = Path(os.getenv("DEALFINDER_STATE_PATH", "data/dealfinder.db"))
@@ -37,6 +43,11 @@ def build_parser() -> argparse.ArgumentParser:
     show.add_argument("rank", type=int)
     show.add_argument("--run-id", type=int)
     show.add_argument("--state", type=Path, default=DEFAULT_STATE)
+    history = commands.add_parser("history", help="show observed price history for a listing")
+    history.add_argument("provider")
+    history.add_argument("listing_id")
+    history.add_argument("--format", choices=["table", "json"], default="table")
+    history.add_argument("--state", type=Path, default=DEFAULT_STATE)
     return parser
 
 
@@ -88,6 +99,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         if args.command == "show":
             print(render_detail(SQLiteRepository(args.state).load_rank(args.rank, args.run_id)))
+            return 0
+        if args.command == "history":
+            history = SQLiteRepository(args.state).price_history(args.provider, args.listing_id)
+            print(render_price_history(history, args.format))
             return 0
         run, config = asyncio.run(_search(args))
     except (ValueError, LookupError, OSError) as error:

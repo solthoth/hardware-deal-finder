@@ -10,12 +10,14 @@ from decimal import Decimal
 from pathlib import Path
 
 from dealfinder.models import RankedListing
+from dealfinder.service import SearchRun
 
 SCHEMA = """
 PRAGMA foreign_keys = ON;
 CREATE TABLE IF NOT EXISTS search_runs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    started_at TEXT NOT NULL
+    started_at TEXT NOT NULL,
+    result_json TEXT
 );
 CREATE TABLE IF NOT EXISTS listings (
     listing_key TEXT PRIMARY KEY,
@@ -74,17 +76,40 @@ class SQLiteRepository:
     def _initialize(self) -> None:
         with self._connect() as connection:
             connection.executescript(SCHEMA)
+            columns = {row["name"] for row in connection.execute("PRAGMA table_info(search_runs)")}
+            if "result_json" not in columns:
+                connection.execute("ALTER TABLE search_runs ADD COLUMN result_json TEXT")
 
     def save(self, ranked: list[RankedListing]) -> int:
+        """Backward-compatible helper for callers that only have ranked listings."""
+
+        return self.save_run(SearchRun(ranked=ranked, observed=ranked, provider_results={}))
+
+    def save_run(self, run: SearchRun) -> int:
         observed_at = datetime.now(UTC).isoformat()
         with self._connect() as connection:
             cursor = connection.execute(
-                "INSERT INTO search_runs(started_at) VALUES (?)", (observed_at,)
+                "INSERT INTO search_runs(started_at, result_json) VALUES (?, ?)",
+                (observed_at, run.model_dump_json()),
             )
             run_id = int(cursor.lastrowid or 0)
-            for rank, result in enumerate(ranked, start=1):
+            rank_by_key = {
+                _listing_key(
+                    result.listing.provider,
+                    result.listing.listing_id,
+                    str(result.listing.url),
+                ): rank
+                for rank, result in enumerate(run.ranked, start=1)
+            }
+            observed = run.observed or run.ranked
+            unique_observed: dict[str, RankedListing] = {}
+            for result in observed:
                 listing = result.listing
                 key = _listing_key(listing.provider, listing.listing_id, str(listing.url))
+                unique_observed[key] = result
+            for key, result in unique_observed.items():
+                listing = result.listing
+                rank = rank_by_key.get(key, 0)
                 connection.execute(
                     """
                     INSERT INTO listings(
@@ -124,7 +149,26 @@ class SQLiteRepository:
                         result.model_dump_json(),
                     ),
                 )
+            saved_run = run.model_copy(update={"run_id": run_id})
+            connection.execute(
+                "UPDATE search_runs SET result_json = ? WHERE id = ?",
+                (saved_run.model_dump_json(), run_id),
+            )
         return run_id
+
+    def load_run(self, run_id: int | None = None) -> SearchRun:
+        with self._connect() as connection:
+            if run_id is None:
+                row = connection.execute(
+                    "SELECT id, result_json FROM search_runs ORDER BY id DESC LIMIT 1"
+                ).fetchone()
+            else:
+                row = connection.execute(
+                    "SELECT id, result_json FROM search_runs WHERE id = ?", (run_id,)
+                ).fetchone()
+        if row is None or not row["result_json"]:
+            raise LookupError(f"search run {run_id or 'latest'} was not found")
+        return SearchRun.model_validate_json(row["result_json"])
 
     def load_rank(self, rank: int, run_id: int | None = None) -> RankedListing:
         with self._connect() as connection:
