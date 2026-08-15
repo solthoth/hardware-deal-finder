@@ -14,9 +14,7 @@ def test_dockerfile_is_locked_and_runs_as_non_root() -> None:
 
 
 def test_kubernetes_cronjob_prevents_overlap_and_mounts_state() -> None:
-    documents = list(
-        yaml.safe_load_all((ROOT / "deploy/kubernetes/cronjob.yaml").read_text())
-    )
+    documents = list(yaml.safe_load_all((ROOT / "deploy/kubernetes/cronjob.yaml").read_text()))
     cronjob = next(document for document in documents if document["kind"] == "CronJob")
     assert cronjob["spec"]["concurrencyPolicy"] == "Forbid"
     pod_spec = cronjob["spec"]["jobTemplate"]["spec"]["template"]["spec"]

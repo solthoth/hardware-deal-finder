@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "hardware-deal-finder"
-version = "0.1.0"
+version = "0.2.0"
 description = "Extensible hardware deal intelligence for homelabs"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -20,7 +20,7 @@ dependencies = [
 dev = [
   "mypy>=1.11,<2",
   "pytest>=8.3,<9",
-  "pytest-asyncio>=0.24,<1",
+  "pytest-asyncio>=1.1,<2",
   "ruff>=0.6,<1",
   "types-pyyaml>=6.0,<7",
 ]

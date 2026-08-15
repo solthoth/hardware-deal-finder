@@ -5,23 +5,32 @@
 Implement `dealfinder.providers.base.HardwareProvider` and its asynchronous `search(criteria)`
 method. Return normalized `HardwareListing` objects. Raise `ProviderUnavailable` for missing
 credentials, disallowed access, maintenance, or incompatible responses, and
-`ProviderRateLimited` after a bounded retry budget. Do not leak marketplace response models into
-the service or domain logic.
+`ProviderRateLimited` after a bounded retry budget. Raise `ProviderUnsupported` when no safe
+documented integration exists. Do not leak marketplace response models into the service or
+domain logic.
 
 ## Implementation checklist
 
 1. Confirm a documented API/feed exists and review current terms, quotas, and authentication.
 2. Add a small adapter module under `dealfinder.providers`.
-3. Accept `SiteConfig`; honor timeout, maximum listings, provider settings, and applicable rate
-   limits. Identify the client and use async connection pooling.
+3. Accept `SiteConfig`; use `ResilientHttpClient` to honor timeout, rate limiting, bounded
+   retries/backoff, response caching, identification, and async connection pooling.
 4. Read secrets from provider-specific environment variables. Never add them to YAML, fixtures,
    logs, URLs, or exceptions.
 5. Keep authentication, retries/backoff, HTTP status mapping, and response parsing in focused
    methods.
 6. Map responses through provider-local parsing and shared normalization into
    `HardwareListing`. Preserve raw data only for diagnostics; do not use it in central logic.
-7. Add a factory decorated with `register_provider("name")`, import the built-in module from the
-   provider package, and add its policy to `config/sites.yaml`.
+7. For a built-in adapter, decorate a factory with `register_provider("name")` and import its
+   module from the provider package. For an external package, publish the factory as an entry
+   point instead:
+
+   ```toml
+   [project.entry-points."dealfinder.providers"]
+   vendor = "vendor_package.provider:build_provider"
+   ```
+
+   A factory accepts `SiteConfig` and returns `HardwareProvider`.
 8. Add mocked tests for success, missing credentials, malformed/empty data, rate limiting,
    retries, and safe unavailability. Never make a live request from pytest.
 9. Run `make verify` before committing.
@@ -36,6 +45,8 @@ not add circumvention.
 
 ## Registration boundary
 
-Registration is intentionally separate from orchestration. Adding a provider may extend the
-provider package's composition imports and YAML, but must not add marketplace branches to
-`SearchService`, filtering, scoring, persistence, or reporting.
+Registration is intentionally separate from orchestration. External providers require only an
+installed entry point and YAML. Built-ins may extend composition imports and YAML, but neither
+path may add marketplace branches to `SearchService`, filtering, scoring, persistence, or
+reporting. Use `provider: generic` aliases when several trusted sites share documented JSON-feed
+semantics.
