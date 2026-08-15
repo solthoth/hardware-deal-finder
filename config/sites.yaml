@@ -1,0 +1,14 @@
+defaults: {request_timeout_seconds: 15, rate_limit_per_second: 1, max_listings: 50}
+sites:
+  ebay:
+    enabled: true
+    trust_weight: 1.0
+    settings: {marketplace_id: EBAY_US}
+  fixture: {enabled: false, trust_weight: 1.0}
+  amazon: {enabled: false, trust_weight: 0.9, settings: {status: placeholder}}
+  newegg: {enabled: false, trust_weight: 0.9, settings: {status: placeholder}}
+  minisforum: {enabled: false, trust_weight: 1.0, settings: {status: placeholder}}
+  lenovo: {enabled: false, trust_weight: 1.0, settings: {status: placeholder}}
+  dell: {enabled: false, trust_weight: 1.0, settings: {status: placeholder}}
+  hp: {enabled: false, trust_weight: 1.0, settings: {status: placeholder}}
+  backmarket: {enabled: false, trust_weight: 0.9, settings: {status: placeholder}}

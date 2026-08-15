@@ -1,0 +1,23 @@
+search:
+  category: mini_pc
+  query: "mini pc (Ryzen PRO, i5 T) 16GB"
+  quantity_required: 3
+  price: {max_per_unit: 350, preferred_max: 275}
+  cpu:
+    vendors: [AMD, Intel]
+    min_physical_cores: 6
+    min_threads: 12
+    preferred_models: [Ryzen 5 PRO 5650GE, Ryzen 5 PRO 5750GE, Ryzen 7 PRO 4750GE, Ryzen 7 PRO 5750GE, Core i5-10500T, Core i5-11500T, Core i5-12500T]
+  memory: {minimum_gb: 16, desired_gb: 32, upgradeable_to_gb: 64}
+  storage: {minimum_gb: 256, desired_gb: 1000, nvme_preferred: true}
+  networking: {minimum_speed_gbps: 1, preferred_speed_gbps: 2.5}
+  security: {tpm_2_required: true, secure_boot_required: true, virtualization_required: true, iommu_preferred: true}
+  enterprise: {preferred: true, capabilities: [AMD_PRO, Intel_vPro, Intel_AMT, DASH]}
+  condition: {allowed: [new, manufacturer_refurbished, certified_refurbished, excellent_refurbished, used]}
+  sellers: {minimum_rating_percent: 98, minimum_feedback_count: 100}
+  exclusions: {keywords: [parts only, broken, no power, as-is, motherboard only]}
+scoring: {price: 0.30, cpu: 0.20, memory: 0.15, storage: 0.10, security: 0.10, networking: 0.05, seller: 0.05, warranty: 0.05}
+upgrade_costs:
+  ram: {32_gb: 45, 64_gb: 95}
+  nvme: {1000_gb: 65, 2000_gb: 110}
+
