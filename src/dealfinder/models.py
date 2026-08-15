@@ -25,6 +25,12 @@ class AttributeValue[T](BaseModel):
     confidence: float = Field(default=1.0, ge=0, le=1)
 
 
+class AttributeEvidence(BaseModel):
+    source: AttributeSource
+    confidence: float = Field(default=1.0, ge=0, le=1)
+    reference: HttpUrl | None = None
+
+
 class HardwareListing(BaseModel):
     """Marketplace-neutral hardware listing."""
 
@@ -64,6 +70,7 @@ class HardwareListing(BaseModel):
     warranty: str | None = None
     discovered_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     raw_attributes: dict[str, Any] = Field(default_factory=dict, exclude=True)
+    attribute_provenance: dict[str, AttributeEvidence] = Field(default_factory=dict)
 
     @computed_field  # type: ignore[prop-decorator]
     @property

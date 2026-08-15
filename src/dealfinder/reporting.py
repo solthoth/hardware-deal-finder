@@ -129,6 +129,14 @@ def render_detail(result: RankedListing) -> str:
     lines.extend(["", "Score breakdown:"])
     lines.extend(f"  {name}: {score:.1f}" for name, score in result.score.categories.items())
     lines.extend(["", "Why this rank:", *result.score.explanation])
+    if listing.attribute_provenance:
+        lines.extend(["", "Attribute provenance:"])
+        for attribute, evidence in sorted(listing.attribute_provenance.items()):
+            reference = f" ({evidence.reference})" if evidence.reference else ""
+            lines.append(
+                f"- {attribute}: {evidence.source.value}, "
+                f"confidence {evidence.confidence:.2f}{reference}"
+            )
     missing = [label for label, value in fields.items() if value in {"unknown", "?"}]
     if missing:
         lines.extend(["", "Missing information:", *(f"- {label}" for label in missing)])
