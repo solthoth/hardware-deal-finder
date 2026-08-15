@@ -31,6 +31,8 @@ class HardwareProvider(ABC):
 
     def __init__(self, config: SiteConfig) -> None:
         self.config = config
+        if config.name:
+            self.name = config.name
 
     @property
     def trust_weight(self) -> float:

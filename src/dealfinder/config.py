@@ -10,62 +10,66 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
-class PriceCriteria(BaseModel):
+class ConfigModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class PriceCriteria(ConfigModel):
     max_per_unit: Decimal = Field(gt=0)
     preferred_max: Decimal = Field(gt=0)
 
 
-class CpuCriteria(BaseModel):
+class CpuCriteria(ConfigModel):
     vendors: list[str] = Field(default_factory=list)
     min_physical_cores: int | None = Field(default=None, gt=0)
     min_threads: int | None = Field(default=None, gt=0)
     preferred_models: list[str] = Field(default_factory=list)
 
 
-class MemoryCriteria(BaseModel):
+class MemoryCriteria(ConfigModel):
     minimum_gb: int | None = Field(default=None, gt=0)
     desired_gb: int | None = Field(default=None, gt=0)
     upgradeable_to_gb: int | None = Field(default=None, gt=0)
 
 
-class StorageCriteria(BaseModel):
+class StorageCriteria(ConfigModel):
     minimum_gb: int | None = Field(default=None, gt=0)
     desired_gb: int | None = Field(default=None, gt=0)
     nvme_preferred: bool = False
 
 
-class NetworkingCriteria(BaseModel):
+class NetworkingCriteria(ConfigModel):
     minimum_speed_gbps: float | None = Field(default=None, gt=0)
     preferred_speed_gbps: float | None = Field(default=None, gt=0)
 
 
-class SecurityCriteria(BaseModel):
+class SecurityCriteria(ConfigModel):
     tpm_2_required: bool = False
     secure_boot_required: bool = False
     virtualization_required: bool = False
     iommu_preferred: bool = False
 
 
-class EnterpriseCriteria(BaseModel):
+class EnterpriseCriteria(ConfigModel):
     preferred: bool = False
     capabilities: list[str] = Field(default_factory=list)
 
 
-class ConditionCriteria(BaseModel):
+class ConditionCriteria(ConfigModel):
     allowed: list[str] = Field(default_factory=list)
 
 
-class SellerCriteria(BaseModel):
+class SellerCriteria(ConfigModel):
     minimum_rating_percent: float | None = Field(default=None, ge=0, le=100)
     minimum_feedback_count: int | None = Field(default=None, ge=0)
 
 
-class ExclusionCriteria(BaseModel):
+class ExclusionCriteria(ConfigModel):
     keywords: list[str] = Field(default_factory=list)
 
 
-class SearchCriteria(BaseModel):
-    model_config = ConfigDict(validate_assignment=True)
+class SearchCriteria(ConfigModel):
+    model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
     category: str
     query: str | None = None
@@ -82,7 +86,7 @@ class SearchCriteria(BaseModel):
     exclusions: ExclusionCriteria = Field(default_factory=ExclusionCriteria)
 
 
-class ScoringWeights(BaseModel):
+class ScoringWeights(ConfigModel):
     price: float = 0.30
     cpu: float = 0.20
     memory: float = 0.15
@@ -103,7 +107,7 @@ def _normalize_upgrade_map(values: dict[str | int, Decimal]) -> dict[int, Decima
     return {int(str(key).removesuffix("_gb")): value for key, value in values.items()}
 
 
-class UpgradeCosts(BaseModel):
+class UpgradeCosts(ConfigModel):
     ram: dict[int, Decimal] = Field(default_factory=dict)
     nvme: dict[int, Decimal] = Field(default_factory=dict)
 
@@ -119,19 +123,21 @@ class UpgradeCosts(BaseModel):
         }
 
 
-class SearchConfig(BaseModel):
+class SearchConfig(ConfigModel):
     search: SearchCriteria
     scoring: ScoringWeights = Field(default_factory=ScoringWeights)
     upgrade_costs: UpgradeCosts = Field(default_factory=UpgradeCosts)
 
 
-class SiteDefaults(BaseModel):
+class SiteDefaults(ConfigModel):
     request_timeout_seconds: float = Field(default=15, gt=0)
     rate_limit_per_second: float = Field(default=1, gt=0)
     max_listings: int = Field(default=50, gt=0)
 
 
-class SiteConfig(BaseModel):
+class SiteConfig(ConfigModel):
+    name: str | None = None
+    provider: str | None = None
     enabled: bool = True
     trust_weight: float = Field(default=1, ge=0, le=1)
     request_timeout_seconds: float = Field(default=15, gt=0)
@@ -140,7 +146,7 @@ class SiteConfig(BaseModel):
     settings: dict[str, Any] = Field(default_factory=dict)
 
 
-class SitesConfig(BaseModel):
+class SitesConfig(ConfigModel):
     defaults: SiteDefaults = Field(default_factory=SiteDefaults)
     sites: dict[str, SiteConfig]
 
@@ -162,6 +168,7 @@ def load_sites_config(path: str | Path) -> SitesConfig:
     defaults = SiteDefaults.model_validate(data.get("defaults", {}))
     default_values = defaults.model_dump()
     data["sites"] = {
-        name: {**default_values, **settings} for name, settings in data.get("sites", {}).items()
+        name: {**default_values, "name": name, **settings}
+        for name, settings in data.get("sites", {}).items()
     }
     return SitesConfig.model_validate(data)

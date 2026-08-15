@@ -49,7 +49,7 @@ ACCESS_LIMITATIONS: dict[str, tuple[str, str]] = {
 class RestrictedMarketplaceProvider(HardwareProvider):
     def __init__(self, name: str, reason: str, documentation_url: str, config: SiteConfig) -> None:
         super().__init__(config)
-        self.name = name
+        self.name = config.name or name
         self.reason = reason
         self.documentation_url = documentation_url
 
