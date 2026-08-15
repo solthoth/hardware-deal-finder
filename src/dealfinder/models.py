@@ -87,9 +87,9 @@ class RankedListing(BaseModel):
     listing: HardwareListing
     score: ScoreBreakdown
     estimated_upgrade_cost: Decimal = Decimal(0)
+    quantity_required: int = Field(default=1, gt=0)
 
     @computed_field  # type: ignore[prop-decorator]
     @property
     def required_quantity_cost(self) -> Decimal:
-        quantity = int(self.listing.raw_attributes.get("quantity_required", 1))
-        return (self.listing.total_price + self.estimated_upgrade_cost) * quantity
+        return (self.listing.total_price + self.estimated_upgrade_cost) * self.quantity_required
