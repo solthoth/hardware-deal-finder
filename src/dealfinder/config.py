@@ -123,10 +123,16 @@ class UpgradeCosts(ConfigModel):
         }
 
 
+class WatchConfig(ConfigModel):
+    minimum_score: float = Field(default=85, ge=0, le=100)
+    minimum_price_drop_percent: Decimal = Field(default=Decimal("5"), gt=0, le=100)
+
+
 class SearchConfig(ConfigModel):
     search: SearchCriteria
     scoring: ScoringWeights = Field(default_factory=ScoringWeights)
     upgrade_costs: UpgradeCosts = Field(default_factory=UpgradeCosts)
+    watch: WatchConfig = Field(default_factory=WatchConfig)
 
 
 class SiteDefaults(ConfigModel):

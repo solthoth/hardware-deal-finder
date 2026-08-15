@@ -42,7 +42,7 @@ spec:
               image: ghcr.io/solthoth/hardware-deal-finder:latest
               imagePullPolicy: Always
               args:
-                - search
+                - watch
                 - --format
                 - json
                 - --state
@@ -75,4 +75,3 @@ spec:
                 claimName: hardware-deal-finder-state
             - name: temporary
               emptyDir: {}
-

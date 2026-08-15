@@ -7,10 +7,12 @@ import asyncio
 import logging
 import os
 from collections.abc import Sequence
+from contextlib import suppress
 from decimal import Decimal
 from pathlib import Path
 
 from dealfinder.config import SearchConfig, SitesConfig, load_search_config, load_sites_config
+from dealfinder.notifications import create_notification_provider
 from dealfinder.persistence import SQLiteRepository
 from dealfinder.providers import create_enabled_providers
 from dealfinder.reporting import (
@@ -21,6 +23,7 @@ from dealfinder.reporting import (
     render_table,
 )
 from dealfinder.service import SearchRun, SearchService
+from dealfinder.watch import detect_deal_events
 
 DEFAULT_STATE = Path(os.getenv("DEALFINDER_STATE_PATH", "data/dealfinder.db"))
 
@@ -39,6 +42,17 @@ def build_parser() -> argparse.ArgumentParser:
     search.add_argument("--top", type=int, default=20)
     search.add_argument("--format", choices=["table", "json", "csv"], default="table")
     search.add_argument("--state", type=Path, default=DEFAULT_STATE)
+    watch = commands.add_parser("watch", help="search once and emit new or improved deals")
+    watch.add_argument("--config", default="config/search.yaml")
+    watch.add_argument("--sites", default="config/sites.yaml")
+    watch.add_argument("--provider", action="append")
+    watch.add_argument("--max-price", type=Decimal)
+    watch.add_argument("--cpu")
+    watch.add_argument("--quantity", type=int)
+    watch.add_argument("--top", type=int, default=20)
+    watch.add_argument("--format", choices=["table", "json"], default="table")
+    watch.add_argument("--notify", default="console")
+    watch.add_argument("--state", type=Path, default=DEFAULT_STATE)
     show = commands.add_parser("show", help="show a ranked result from the latest search")
     show.add_argument("rank", type=int)
     show.add_argument("--run-id", type=int)
@@ -104,9 +118,23 @@ def main(argv: Sequence[str] | None = None) -> int:
             history = SQLiteRepository(args.state).price_history(args.provider, args.listing_id)
             print(render_price_history(history, args.format))
             return 0
+        previous = None
+        if args.command == "watch":
+            with suppress(LookupError):
+                previous = SQLiteRepository(args.state).load_run()
         run, config = asyncio.run(_search(args))
     except (ValueError, LookupError, OSError) as error:
         parser.error(str(error))
+    if args.command == "watch":
+        events = detect_deal_events(
+            run,
+            previous,
+            minimum_score=config.watch.minimum_score,
+            minimum_price_drop_percent=config.watch.minimum_price_drop_percent,
+        )
+        notifier = create_notification_provider(args.notify, args.format)
+        asyncio.run(notifier.notify(events))
+        return 0
     if args.format == "table":
         output = render_table(run, config.search)
     elif args.format == "json":

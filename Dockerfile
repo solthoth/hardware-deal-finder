@@ -26,5 +26,4 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 USER 65532:65532
 
 ENTRYPOINT ["dealfinder"]
-CMD ["search", "--format", "json", "--state", "/state/dealfinder.db"]
-
+CMD ["watch", "--format", "json", "--state", "/state/dealfinder.db"]

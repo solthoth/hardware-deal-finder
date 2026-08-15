@@ -20,4 +20,6 @@ scoring: {price: 0.30, cpu: 0.20, memory: 0.15, storage: 0.10, security: 0.10, n
 upgrade_costs:
   ram: {32_gb: 45, 64_gb: 95}
   nvme: {1000_gb: 65, 2000_gb: 110}
-
+watch:
+  minimum_score: 85
+  minimum_price_drop_percent: 5
