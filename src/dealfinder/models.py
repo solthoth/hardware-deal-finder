@@ -88,6 +88,7 @@ class RankedListing(BaseModel):
     score: ScoreBreakdown
     estimated_upgrade_cost: Decimal = Decimal(0)
     quantity_required: int = Field(default=1, gt=0)
+    warnings: list[str] = Field(default_factory=list)
 
     @computed_field  # type: ignore[prop-decorator]
     @property

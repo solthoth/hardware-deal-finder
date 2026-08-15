@@ -97,6 +97,7 @@ class DealScorer:
             ),
             estimated_upgrade_cost=self._upgrade_cost(listing),
             quantity_required=self.criteria.quantity_required,
+            warnings=list(listing.raw_attributes.get("warnings", [])),
         )
 
     def _upgrade_cost(self, listing: HardwareListing) -> Decimal:

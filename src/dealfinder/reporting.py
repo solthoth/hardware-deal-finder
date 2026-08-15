@@ -33,6 +33,24 @@ def render_table(run: SearchRun, criteria: SearchCriteria) -> str:
         )
     if not run.ranked:
         lines.append("No qualifying listings found.")
+    else:
+        best = run.ranked[0]
+        listing = best.listing
+        cores = listing.physical_cores.value if listing.physical_cores else 0
+        threads = listing.threads.value if listing.threads else 0
+        lines.extend(
+            [
+                "",
+                "Best Cluster Deal",
+                f"  {listing.title}",
+                f"  Hardware: ${listing.total_price * criteria.quantity_required}",
+                f"  Estimated upgrades: "
+                f"${best.estimated_upgrade_cost * criteria.quantity_required}",
+                f"  Estimated cluster total: ${best.required_quantity_cost}",
+                f"  CPU total: {cores * criteria.quantity_required} cores / "
+                f"{threads * criteria.quantity_required} threads",
+            ]
+        )
     if run.provider_results:
         lines.extend(["", "Providers:"])
         for name, provider_result in run.provider_results.items():
@@ -98,7 +116,9 @@ def render_detail(result: RankedListing) -> str:
     lines.extend(["", "Score breakdown:"])
     lines.extend(f"  {name}: {score:.1f}" for name, score in result.score.categories.items())
     lines.extend(["", "Why this rank:", *result.score.explanation])
-    warnings = listing.raw_attributes.get("warnings", [])
-    if warnings:
-        lines.extend(["", "Warnings:", *(f"- {warning}" for warning in warnings)])
+    missing = [label for label, value in fields.items() if value in {"unknown", "?"}]
+    if missing:
+        lines.extend(["", "Missing information:", *(f"- {label}" for label in missing)])
+    if result.warnings:
+        lines.extend(["", "Warnings:", *(f"- {warning}" for warning in result.warnings)])
     return "\n".join(lines)
